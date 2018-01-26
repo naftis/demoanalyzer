@@ -104,16 +104,18 @@ function parseDemoFile(path, examinedPlayerNames : string[]) : void {
     const yawErrorRange = 0.05;
 
     demoFile.on('tickstart', () => {
+      const players : Player[] = demoFile.entities.players;
+
       if(hasWarmupEnded) {
-        for(const examinedPlayer of demoFile.entities.players) {
+        for(const examinedPlayer of players) {
           if(!examinedPlayerNames.includes(examinedPlayer.name)) {
             continue;
           }
 
-          for(const lookingAtPlayer of demoFile.entities.players) {
+          for(const lookingAtPlayer of players) {
             const isLookingAtHimself = examinedPlayer.name === lookingAtPlayer.name;
             const isExaminedPlayer = examinedPlayerNames.includes(lookingAtPlayer.name);
-            const isBehindWall = !(examinedPlayer.isSpotted(lookingAtPlayer));
+            const isBehindWall = !(lookingAtPlayer.isSpottedBy(examinedPlayer));
             const isPitchWithinRange = examinedPlayer.eyeAngles.pitch > -90 && examinedPlayer.eyeAngles.pitch < 90;
             const isYawWithinRange = examinedPlayer.eyeAngles.yaw > -180 && examinedPlayer.eyeAngles.yaw < 180;
             const isPitchOrYawZero = examinedPlayer.eyeAngles.pitch === 0 || examinedPlayer.eyeAngles.yaw === 0;
