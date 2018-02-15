@@ -73,27 +73,24 @@ async function writeDatabaseToFile(database: IPlayerData[]): Promise<void> {
 }
 
 function findTickWallhacks(examinedPlayerNames: string[], players: Player[], currentTick: number): IPlayerData[] {
-  const foundWallhacks = players
-  .filter((examinedPlayer) => examinedPlayerNames.includes(examinedPlayer.name))
-  .map(examinedPlayer => (players
-      .filter(lookingAtPlayer => 
-        examinedPlayerNames.includes(lookingAtPlayer.name)
-        && isLookingAtPlayer(examinedPlayer, lookingAtPlayer)
-      )
-      .map(lookingAtPlayer => ({
-        examinedPlayer: examinedPlayer.name,
-        lookingAtPlayer: lookingAtPlayer.name,
-        tick: currentTick,
-      }))
+  const foundWallhacks = players.filter(examinedPlayer =>
+    examinedPlayerNames.includes(examinedPlayer.name)
+  ).map(examinedPlayer =>
+    (players.filter(lookingAtPlayer => 
+      examinedPlayerNames.includes(lookingAtPlayer.name) && isLookingAtPlayer(examinedPlayer, lookingAtPlayer)
+    ).map(lookingAtPlayer => ({
+      examinedPlayer: examinedPlayer.name,
+      lookingAtPlayer: lookingAtPlayer.name,
+      tick: currentTick,
+    }))
   ));
 
   return [].concat.apply([], foundWallhacks);
 }
 
-
-function parseDemoFile(path, examinedPlayerNames : string[]) : void {
-  const database : IPlayerData[] = [];
-
+function parseDemoFile(path: string, examinedPlayerNames: string[]): void {
+  const database: IPlayerData[] = [];
+  
   return fs.readFile(path, (err, buffer) => {
     assert.ifError(err);
 
