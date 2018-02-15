@@ -42,17 +42,6 @@ function angleCalculator(cameraPos : IPos, enemyPos : IPos) : IAngle {
   };
 }
 
-async function writeDatabaseToFile(database: string): Promise<void> {
-  const writeFile = util.promisify(fs.writeFile);
-  return await writeFile('file.json', database);
-}
-
-interface IPlayerData {
-  examinedPlayer: string;
-  lookingAtPlayer: string;
-  tick: number;
-}
-
 function isLookingAtPlayer(examinedPlayer: Player, lookingAtPlayer: Player): boolean {
   const isLookingAtHimself = examinedPlayer.name === lookingAtPlayer.name;
   const isBehindWall = !(lookingAtPlayer.isSpottedBy(examinedPlayer));
@@ -72,6 +61,17 @@ function isLookingAtPlayer(examinedPlayer: Player, lookingAtPlayer: Player): boo
          && !isPitchOrYawZero && targetPitchWithinErrorRange && targetYawWithinErrorRange;
 }
 
+interface IPlayerData {
+  examinedPlayer: string;
+  lookingAtPlayer: string;
+  tick: number;
+}
+
+async function writeDatabaseToFile(database: IPlayerData[]): Promise<void> {
+  const writeFile = util.promisify(fs.writeFile);
+  return await writeFile('file.json', JSON.stringify(database));
+}
+
 function findTickWallhacks(examinedPlayerNames: string[], players: Player[], currentTick: number): IPlayerData[] {
   const foundWallhacks = players
   .filter((examinedPlayer) => examinedPlayerNames.includes(examinedPlayer.name))
@@ -89,6 +89,7 @@ function findTickWallhacks(examinedPlayerNames: string[], players: Player[], cur
 
   return [].concat.apply([], foundWallhacks);
 }
+
 
 function parseDemoFile(path, examinedPlayerNames : string[]) : void {
   const database : IPlayerData[] = [];
@@ -125,7 +126,7 @@ function parseDemoFile(path, examinedPlayerNames : string[]) : void {
       database.push(...foundWallhacks);
     });
 
-    demoFile.gameEvents.on('round_end', () => writeDatabaseToFile(JSON.stringify(database)));
+    demoFile.gameEvents.on('round_end', () => writeDatabaseToFile(database));
   });
 }
 
