@@ -39,7 +39,7 @@ function angleCalculator(cameraPos : IPos, enemyPos : IPos) : IAngle {
   return {
     pitch,
     yaw,
-  }
+  };
 }
 
 async function writeDatabaseToFile(database: string): Promise<void> {
@@ -129,4 +129,7 @@ function parseDemoFile(path, examinedPlayerNames : string[]) : void {
   });
 }
 
-parseDemoFile('./sk-vs-space-soldiers-mirage.dem', ['fer', 'Calyx', 'paz', 'ngiN', 'felps', 'TACO', 'XANTARES', 'coldzera', 'MAJ3R', 'FalleN'])
+parseDemoFile(
+  './sk-vs-space-soldiers-mirage.dem',
+  ['fer', 'Calyx', 'paz', 'ngiN', 'felps', 'TACO', 'XANTARES', 'coldzera', 'MAJ3R', 'FalleN']
+);
