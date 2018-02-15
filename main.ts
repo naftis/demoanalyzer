@@ -18,7 +18,7 @@ interface IAngle {
   yaw: number,
 };
 
-function angleCalculator(cameraPos : IPos, enemyPos : IPos) : IAngle {
+function angleCalculator(cameraPos: IPos, enemyPos: IPos): IAngle {
   const deltaX = cameraPos.x - enemyPos.x;
   const deltaY = cameraPos.y - enemyPos.y;
   const deltaZ = cameraPos.z - enemyPos.z;
@@ -52,13 +52,13 @@ function isLookingAtPlayer(examinedPlayer: Player, lookingAtPlayer: Player): boo
   const target = angleCalculator(examinedPlayer.position, lookingAtPlayer.position);
 
   const targetPitchWithinErrorRange = target.pitch - PITCH_ERROR_RANGE <= examinedPlayer.eyeAngles.pitch
-                                      && examinedPlayer.eyeAngles.pitch <= target.pitch + PITCH_ERROR_RANGE;
+                                   && examinedPlayer.eyeAngles.pitch <= target.pitch + PITCH_ERROR_RANGE;
 
   const targetYawWithinErrorRange = target.yaw - YAW_ERROR_RANGE <= examinedPlayer.eyeAngles.yaw
-                                    && examinedPlayer.eyeAngles.yaw <= target.yaw + YAW_ERROR_RANGE;
+                                 && examinedPlayer.eyeAngles.yaw <= target.yaw + YAW_ERROR_RANGE;
 
   return !isLookingAtHimself && isBehindWall && isPitchWithinRange && isYawWithinRange
-         && !isPitchOrYawZero && targetPitchWithinErrorRange && targetYawWithinErrorRange;
+      && !isPitchOrYawZero && targetPitchWithinErrorRange && targetYawWithinErrorRange;
 }
 
 interface IPlayerData {
