@@ -1,10 +1,11 @@
-/*eslint-disable no-console*/
-
 import * as fs from 'fs';
 import * as assert from 'assert';
 import * as demo from 'demofile';
 import * as util from 'util';
 import Player from './entities/player';
+
+const PITCH_ERROR_RANGE = 0.7;
+const YAW_ERROR_RANGE = 0.05;
 
 interface IPos {
   x: number,
@@ -33,125 +34,97 @@ function angleCalculator(cameraPos : IPos, enemyPos : IPos) : IAngle {
   }
 
   const hypotenuse = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-  let pitch = Math.atan(deltaZ / hypotenuse) * (180 / Math.PI);
+  const pitch = Math.atan(deltaZ / hypotenuse) * (180 / Math.PI);
 
   return {
-      pitch,
-      yaw,
+    pitch,
+    yaw,
   }
 }
 
-function initializeDatabase(examinedPlayerNames : string[]) : object {
-  const database = {};
-
-  for(const playerAddedToData of examinedPlayerNames) {
-    database[playerAddedToData] = {};
-
-    for(const otherPlayer of examinedPlayerNames) {
-      if(playerAddedToData !== otherPlayer) {
-        database[playerAddedToData][otherPlayer] = [];
-      }
-    }
-  }
-
-  return database;
+async function writeDatabaseToFile(database: string): Promise<void> {
+  const writeFile = util.promisify(fs.writeFile);
+  return await writeFile('file.json', database);
 }
 
-function writeDatabaseToFile(database : string) : Promise<string> {
-  return new Promise((resolve, reject) => {
-    fs.writeFile('file.json', database, (err) => {
-      if(err) {
-        reject(err);
-      } else {
-        resolve('Data written');
-      }
-    });
-  });
+interface IPlayerData {
+  examinedPlayer: string;
+  lookingAtPlayer: string;
+  tick: number;
+}
+
+function isLookingAtPlayer(examinedPlayer: Player, lookingAtPlayer: Player): boolean {
+  const isLookingAtHimself = examinedPlayer.name === lookingAtPlayer.name;
+  const isBehindWall = !(lookingAtPlayer.isSpottedBy(examinedPlayer));
+  const isPitchWithinRange = examinedPlayer.eyeAngles.pitch > -90 && examinedPlayer.eyeAngles.pitch < 90;
+  const isYawWithinRange = examinedPlayer.eyeAngles.yaw > -180 && examinedPlayer.eyeAngles.yaw < 180;
+  const isPitchOrYawZero = examinedPlayer.eyeAngles.pitch === 0 || examinedPlayer.eyeAngles.yaw === 0;
+
+  const target = angleCalculator(examinedPlayer.position, lookingAtPlayer.position);
+
+  const targetPitchWithinErrorRange = target.pitch - PITCH_ERROR_RANGE <= examinedPlayer.eyeAngles.pitch
+                                      && examinedPlayer.eyeAngles.pitch <= target.pitch + PITCH_ERROR_RANGE;
+
+  const targetYawWithinErrorRange = target.yaw - YAW_ERROR_RANGE <= examinedPlayer.eyeAngles.yaw
+                                    && examinedPlayer.eyeAngles.yaw <= target.yaw + YAW_ERROR_RANGE;
+
+  return !isLookingAtHimself && isBehindWall && isPitchWithinRange && isYawWithinRange
+         && !isPitchOrYawZero && targetPitchWithinErrorRange && targetYawWithinErrorRange;
+}
+
+function findTickWallhacks(examinedPlayerNames: string[], players: Player[], currentTick: number): IPlayerData[] {
+  const foundWallhacks = players
+  .filter((examinedPlayer) => examinedPlayerNames.includes(examinedPlayer.name))
+  .map(examinedPlayer => (players
+      .filter(lookingAtPlayer => 
+        examinedPlayerNames.includes(lookingAtPlayer.name)
+        && isLookingAtPlayer(examinedPlayer, lookingAtPlayer)
+      )
+      .map(lookingAtPlayer => ({
+        examinedPlayer: examinedPlayer.name,
+        lookingAtPlayer: lookingAtPlayer.name,
+        tick: currentTick,
+      }))
+  ));
+
+  return [].concat.apply([], foundWallhacks);
 }
 
 function parseDemoFile(path, examinedPlayerNames : string[]) : void {
-  const database = initializeDatabase(examinedPlayerNames);
-  
-  return fs.readFile(path, function (err, buffer) {
+  const database : IPlayerData[] = [];
+
+  return fs.readFile(path, (err, buffer) => {
     assert.ifError(err);
 
-    let demoFile = new demo.DemoFile();
+    const demoFile = new demo.DemoFile();
+    demoFile.parse(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength));
 
     demoFile.on('start', () => {
-      console.log('[0 / ' + demoFile.header.playbackTicks + '] ' + demoFile.header.mapName);
+      console.log(`[0 / ${demoFile.header.playbackTicks}] ${demoFile.header.mapName}`);
     });
 
     demoFile.on('end', () => {
       console.log('Finished.');
     });
 
-    let hasWarmupEnded = false;
-    let roundCounter = 0;
-
     demoFile.gameEvents.on('round_start', e => {
-      if(e.objective === 'BOMB TARGET') {
-        roundCounter++;
-
-        if(hasWarmupEnded === false) {
-          hasWarmupEnded = true;
-        }
-
-        console.log('[' + demoFile.currentTick + '] round #' + roundCounter);
-      }
+      const round = demoFile.gameRules.roundNumber + 1;
+      console.log(`[${demoFile.currentTick}] round #${round}`);
     });
 
-    const pitchErrorRange = 0.7;
-    const yawErrorRange = 0.05;
-
-    demoFile.on('tickstart', () => {
+    demoFile.on('tickstart', (e) => {
       const players : Player[] = demoFile.entities.players;
 
-      if(hasWarmupEnded) {
-        for(const examinedPlayer of players) {
-          if(!examinedPlayerNames.includes(examinedPlayer.name)) {
-            continue;
-          }
-
-          for(const lookingAtPlayer of players) {
-            const isLookingAtHimself = examinedPlayer.name === lookingAtPlayer.name;
-            const isExaminedPlayer = examinedPlayerNames.includes(lookingAtPlayer.name);
-            const isBehindWall = !(lookingAtPlayer.isSpottedBy(examinedPlayer));
-            const isPitchWithinRange = examinedPlayer.eyeAngles.pitch > -90 && examinedPlayer.eyeAngles.pitch < 90;
-            const isYawWithinRange = examinedPlayer.eyeAngles.yaw > -180 && examinedPlayer.eyeAngles.yaw < 180;
-            const isPitchOrYawZero = examinedPlayer.eyeAngles.pitch === 0 || examinedPlayer.eyeAngles.yaw === 0;
-
-            if(isLookingAtHimself || !isExaminedPlayer || !isBehindWall || !isPitchWithinRange || !isYawWithinRange || isPitchOrYawZero) {
-              continue;
-            }
-
-            const target = angleCalculator(examinedPlayer.position, lookingAtPlayer.position);
-
-            const targetPitchWithinErrorRange = target.pitch - pitchErrorRange <= examinedPlayer.eyeAngles.pitch
-                                                && examinedPlayer.eyeAngles.pitch <= target.pitch + pitchErrorRange;
-
-            const targetYawWithinErrorRange = target.yaw - yawErrorRange <= examinedPlayer.eyeAngles.yaw
-                                              && examinedPlayer.eyeAngles.yaw <= target.yaw + yawErrorRange;
-            
-            if(targetPitchWithinErrorRange && targetYawWithinErrorRange) {
-                database[examinedPlayer.name][lookingAtPlayer.name].push(demoFile.currentTick);
-            }
-          }
-        }
+      if(!demoFile.gameRules || demoFile.gameRules.isWarmup) {
+        return;
       }
+
+      const foundWallhacks: IPlayerData[] = findTickWallhacks(examinedPlayerNames, players, demoFile.currentTick);
+      database.push(...foundWallhacks);
     });
 
-    demoFile.gameEvents.on('round_end', () => {
-      writeDatabaseToFile(JSON.stringify(database));
-    })
-
-    
-    demoFile.parse(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength));
+    demoFile.gameEvents.on('round_end', () => writeDatabaseToFile(JSON.stringify(database)));
   });
 }
 
-new Promise(() => {
-  parseDemoFile('./sk-vs-space-soldiers-mirage.dem', ['fer', 'Calyx', 'paz', 'ngiN', 'felps', 'TACO', 'XANTARES', 'coldzera', 'MAJ3R', 'FalleN'])
-})
-.catch(e => {
-  console.log(e);
-});
+parseDemoFile('./sk-vs-space-soldiers-mirage.dem', ['fer', 'Calyx', 'paz', 'ngiN', 'felps', 'TACO', 'XANTARES', 'coldzera', 'MAJ3R', 'FalleN'])
