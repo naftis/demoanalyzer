@@ -113,13 +113,15 @@ function parseDemoFile(path, examinedPlayerNames : string[]) : void {
     });
 
     demoFile.on('tickstart', (e) => {
-      const players : Player[] = demoFile.entities.players;
-
       if(!demoFile.gameRules || demoFile.gameRules.isWarmup) {
         return;
       }
 
-      const foundWallhacks: IPlayerData[] = findTickWallhacks(examinedPlayerNames, players, demoFile.currentTick);
+      const foundWallhacks: IPlayerData[] = findTickWallhacks(
+        examinedPlayerNames,
+        demoFile.entities.players,
+        demoFile.currentTick
+      );
       database.push(...foundWallhacks);
     });
 
